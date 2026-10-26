@@ -1,0 +1,483 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Neon Periodic Table</title>
+<style>
+:root {
+  --bg:#030713;
+  --cyan:#00eaff;
+  --pink:#ff35f5;
+  --green:#39ff88;
+}
+* {box-sizing:border-box}
+body {
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:radial-gradient(ellipse at top,#102044,var(--bg) 65%);
+  color:#fff;
+  overflow-x:hidden;
+}
+#particles {position:fixed;inset:0;pointer-events:none;z-index:-1}
+header {text-align:center;padding:25px 10px 15px}
+h1 {
+  font-size:clamp(27px,5vw,52px);
+  margin:10px 0;
+  color:#fff;
+  text-shadow:0 0 8px #00eaff,0 0 22px #00aaff,0 0 40px #ff35f5;
+  animation:glow 3s infinite alternate;
+}
+@keyframes glow {to{filter:hue-rotate(50deg);text-shadow:0 0 20px #ff35f5}}
+header p {color:#8deeff}
+.controls {
+  display:flex;justify-content:center;gap:8px;
+  flex-wrap:wrap;padding:12px;
+}
+input,button,select {
+  background:#07162b;color:white;border:1px solid #00dfff;
+  border-radius:9px;padding:11px;font-size:14px;
+}
+input {width:min(260px,90vw)}
+button {cursor:pointer;box-shadow:0 0 9px #00dfff55}
+button:hover {background:#093452;box-shadow:0 0 16px #00eaff}
+.status {text-align:center;color:#86dff8;font-size:13px}
+.stage {
+  perspective:1100px;padding:12px 8px 25px;
+}
+.table-wrap {
+  width:100%;overflow-x:auto;padding:12px 4px 22px;
+}
+.periodic {
+  display:grid;
+  grid-template-columns:repeat(18,minmax(48px,1fr));
+  gap:5px;min-width:960px;
+  transform-style:preserve-3d;
+  transition:transform .5s;
+}
+.element {
+  min-height:66px;border:1px solid var(--color);
+  background:linear-gradient(145deg,#11233cdd,#040a1bdd);
+  border-radius:7px;text-align:center;padding:5px 1px;
+  cursor:pointer;position:relative;
+  box-shadow:0 0 7px color-mix(in srgb,var(--color) 55%,transparent),
+             inset 0 0 9px color-mix(in srgb,var(--color) 16%,transparent);
+  transition:transform .25s,box-shadow .25s;
+  transform-style:preserve-3d;
+}
+.element:hover {
+  transform:translateZ(22px) scale(1.09);
+  box-shadow:0 0 20px var(--color);
+  z-index:3;
+}
+.num {font-size:10px;text-align:left;padding-left:3px;opacity:.8}
+.symbol {font-size:22px;font-weight:bold;color:var(--color);text-shadow:0 0 8px var(--color)}
+.name {font-size:9px;overflow-wrap:anywhere}
+.alkali{--color:#ff9d21}
+.alkaline{--color:#ffe04b}
+.transition{--color:#19cfff}
+.post{--color:#32ffcc}
+.metalloid{--color:#5dff85}
+.nonmetal{--color:#a3ff36}
+.halogen{--color:#ce73ff}
+.noble{--color:#ff4de1}
+.lanthanide{--color:#a58aff}
+.actinide{--color:#ff4ecb}
+.series {margin-top:12px}
+.series-title {color:#e1a4ff;font-size:13px;margin:10px 0}
+.series-grid {
+ display:grid;grid-template-columns:repeat(15,minmax(48px,1fr));
+ gap:5px;min-width:795px;
+}
+.legend {
+ display:flex;justify-content:center;flex-wrap:wrap;gap:10px;
+ padding:15px;
+}
+.legend span {font-size:12px}
+.dot {display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}
+.panel {
+ margin:15px auto;max-width:620px;width:calc(100% - 24px);
+ padding:18px;border:1px solid #00dfff;border-radius:15px;
+ background:#071329dd;box-shadow:0 0 22px #00bfff33;
+}
+.panel h2 {color:#00eaff;margin-top:0}
+#details {display:none}
+.detail-symbol {font-size:55px;color:#00eaff;text-shadow:0 0 15px #00eaff}
+.info-grid {display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.info {background:#10213b;padding:10px;border-radius:8px;font-size:13px}
+.info b {color:#75eaff}
+footer {text-align:center;color:#74cfe0;font-size:12px;padding:25px}
+@media(max-width:600px) {
+ header{padding-top:16px}
+ .periodic{gap:4px}
+ .element{min-height:58px}
+ .symbol{font-size:18px}
+ .name{font-size:8px}
+ .info-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+<header>
+<h1>⚛ NEON PERIODIC TABLE</h1>
+<p>Explore 118 Elements • Discover • Learn</p>
+</header>
+
+<div class="controls">
+<input id="search" placeholder="🔍 Search element, symbol or number...">
+<button id="rotate">🔄 3D Rotate: OFF</button>
+<button id="reset">↺ Reset View</button>
+<select id="theme" aria-label="Choose theme">
+<option value="cyan">Neon Cyan</option>
+<option value="pink">Neon Pink</option>
+<option value="green">Neon Green</option>
+</select>
+</div>
+<div class="status" id="status">Tap any element to explore it.</div>
+
+<div class="stage">
+<div class="table-wrap">
+<div class="periodic" id="table"></div>
+<div class="series">
+<div class="series-title">57–71 · LANTHANIDES</div>
+<div class="series-grid" id="lanth"></div>
+</div>
+<div class="series">
+<div class="series-title">89–103 · ACTINIDES</div>
+<div class="series-grid" id="act"></div>
+</div>
+</div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="panel" id="details">
+<button id="close" style="float:right">✕ Close</button>
+<h2>ELEMENT INFORMATION</h2>
+<div class="detail-symbol" id="dSymbol"></div>
+<h3 id="dName"></h3>
+<div class="info-grid" id="infoGrid"></div>
+<p id="dFact"></p>
+</div>
+
+<div class="panel">
+<h2>🌍 Explore Science</h2>
+<p>Every element has a unique atomic number, symbol, and chemical properties. Select an element above to discover more.</p>
+<p style="color:#00eaff">Small Particles • Big Impact • Elemental to Life</p>
+</div>
+
+<footer>NEON SCIENCE LAB · Interactive Periodic Table · 118 Elements</footer>
+
+<script>
+const raw = `
+H|Hydrogen|nonmetal
+He|Helium|noble
+Li|Lithium|alkali
+Be|Beryllium|alkaline
+B|Boron|metalloid
+C|Carbon|nonmetal
+N|Nitrogen|nonmetal
+O|Oxygen|nonmetal
+F|Fluorine|halogen
+Ne|Neon|noble
+Na|Sodium|alkali
+Mg|Magnesium|alkaline
+Al|Aluminium|post
+Si|Silicon|metalloid
+P|Phosphorus|nonmetal
+S|Sulfur|nonmetal
+Cl|Chlorine|halogen
+Ar|Argon|noble
+K|Potassium|alkali
+Ca|Calcium|alkaline
+Sc|Scandium|transition
+Ti|Titanium|transition
+V|Vanadium|transition
+Cr|Chromium|transition
+Mn|Manganese|transition
+Fe|Iron|transition
+Co|Cobalt|transition
+Ni|Nickel|transition
+Cu|Copper|transition
+Zn|Zinc|transition
+Ga|Gallium|post
+Ge|Germanium|metalloid
+As|Arsenic|metalloid
+Se|Selenium|nonmetal
+Br|Bromine|halogen
+Kr|Krypton|noble
+Rb|Rubidium|alkali
+Sr|Strontium|alkaline
+Y|Yttrium|transition
+Zr|Zirconium|transition
+Nb|Niobium|transition
+Mo|Molybdenum|transition
+Tc|Technetium|transition
+Ru|Ruthenium|transition
+Rh|Rhodium|transition
+Pd|Palladium|transition
+Ag|Silver|transition
+Cd|Cadmium|transition
+In|Indium|post
+Sn|Tin|post
+Sb|Antimony|metalloid
+Te|Tellurium|metalloid
+I|Iodine|halogen
+Xe|Xenon|noble
+Cs|Caesium|alkali
+Ba|Barium|alkaline
+La|Lanthanum|lanthanide
+Ce|Cerium|lanthanide
+Pr|Praseodymium|lanthanide
+Nd|Neodymium|lanthanide
+Pm|Promethium|lanthanide
+Sm|Samarium|lanthanide
+Eu|Europium|lanthanide
+Gd|Gadolinium|lanthanide
+Tb|Terbium|lanthanide
+Dy|Dysprosium|lanthanide
+Ho|Holmium|lanthanide
+Er|Erbium|lanthanide
+Tm|Thulium|lanthanide
+Yb|Ytterbium|lanthanide
+Lu|Lutetium|lanthanide
+Hf|Hafnium|transition
+Ta|Tantalum|transition
+W|Tungsten|transition
+Re|Rhenium|transition
+Os|Osmium|transition
+Ir|Iridium|transition
+Pt|Platinum|transition
+Au|Gold|transition
+Hg|Mercury|transition
+Tl|Thallium|post
+Pb|Lead|post
+Bi|Bismuth|post
+Po|Polonium|post
+At|Astatine|halogen
+Rn|Radon|noble
+Fr|Francium|alkali
+Ra|Radium|alkaline
+Ac|Actinium|actinide
+Th|Thorium|actinide
+Pa|Protactinium|actinide
+U|Uranium|actinide
+Np|Neptunium|actinide
+Pu|Plutonium|actinide
+Am|Americium|actinide
+Cm|Curium|actinide
+Bk|Berkelium|actinide
+Cf|Californium|actinide
+Es|Einsteinium|actinide
+Fm|Fermium|actinide
+Md|Mendelevium|actinide
+No|Nobelium|actinide
+Lr|Lawrencium|actinide
+Rf|Rutherfordium|transition
+Db|Dubnium|transition
+Sg|Seaborgium|transition
+Bh|Bohrium|transition
+Hs|Hassium|transition
+Mt|Meitnerium|transition
+Ds|Darmstadtium|transition
+Rg|Roentgenium|transition
+Cn|Copernicium|transition
+Nh|Nihonium|post
+Fl|Flerovium|post
+Mc|Moscovium|post
+Lv|Livermorium|post
+Ts|Tennessine|halogen
+Og|Oganesson|noble
+`.trim().split('\n').map((s,i)=>{
+ const [symbol,name,cat]=s.split('|');
+ return {n:i+1,symbol,name,cat};
+});
+const bySymbol=Object.fromEntries(raw.map(e=>[e.symbol,e]));
+const table=document.getElementById('table');
+const lanth=document.getElementById('lanth');
+const act=document.getElementById('act');
+const search=document.getElementById('search');
+const status=document.getElementById('status');
+const details=document.getElementById('details');
+
+const periods=[
+ ['H','He'],
+ ['Li','Be','B','C','N','O','F','Ne'],
+ ['Na','Mg','Al','Si','P','S','Cl','Ar'],
+ ['K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr'],
+ ['Rb','Sr','Y','Zr','Nb','Mo','Tc','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe'],
+ ['Cs','Ba','La','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Po','At','Rn'],
+ ['Fr','Ra','Ac','Rf','Db','Sg','Bh','Hs','Mt','Ds','Rg','Cn','Nh','Fl','Mc','Lv','Ts','Og']
+];
+function positionFor(period,row){
+ const cols=Array(18).fill(null);
+ if(row<3){cols[0]=period[0];cols[17]=period[1]}
+ else if(row<5){
+   period.forEach((s,i)=>cols[i]=s);
+ } else {
+   cols[0]=period[0];cols[1]=period[1];
+   cols[2]='*';
+   period.slice(3).forEach((s,i)=>cols[i+3]=s);
+ }
+ return cols;
+}
+function makeElement(symbol,col,row,container){
+ if(!symbol||symbol==='*') {
+   const spacer=document.createElement('div');
+   spacer.style.cssText='min-height:1px';
+   if(symbol==='*') {
+    spacer.style.cssText='min-height:66px;border:1px dashed #b08aff66;border-radius:7px;display:grid;place-items:center;color:#c5a0ff;font-size:10px';
+    spacer.textContent=row===5?'57–71':'89–103';
+   }
+   container.appendChild(spacer);return;
+ }
+ const e=bySymbol[symbol];if(!e)return;
+ const card=document.createElement('div');
+ card.className='element '+e.cat;
+ card.style.gridColumn=col;
+ card.style.gridRow=row;
+ card.dataset.search=(e.n+' '+e.symbol+' '+e.name+' '+e.cat).toLowerCase();
+ card.innerHTML=`<div class="num">${e.n}</div><div class="symbol">${e.symbol}</div><div class="name">${e.name}</div>`;
+ card.addEventListener('click',()=>showElement(e));
+ container.appendChild(card);
+}
+periods.forEach((p,i)=>{
+ const cols=positionFor(p,i+1);
+ cols.forEach((s,j)=>makeElement(s,j+1,i+1,table));
+});
+raw.filter(e=>e.cat==='lanthanide').forEach((e,i)=>makeElement(e,i+1,1,lanth));
+raw.filter(e=>e.cat==='actinide').forEach((e,i)=>makeElement(e,i+1,1,act));
+
+function showElement(e){
+ details.style.display='block';
+ document.getElementById('dSymbol').textContent=e.symbol;
+ document.getElementById('dName').textContent=e.name;
+ const mass={
+ H:'1.008',He:'4.0026',C:'12.011',N:'14.007',O:'15.999',
+ Na:'22.990',Al:'26.982',Si:'28.085',S:'32.06',Cl:'35.45',
+ Fe:'55.845',Cu:'63.546',Ag:'107.868',Au:'196.967',
+ Hg:'200.592',U:'238.029'
+ };
+ const info=[
+ ['Atomic Number',e.n],
+ ['Symbol',e.symbol],
+ ['Atomic Mass',mass[e.symbol]||'See periodic reference'],
+ ['Category',e.cat.replace(/^\w/,c=>c.toUpperCase())],
+ ['Period',getPeriod(e.n)],
+ ['Group',getGroup(e.symbol)],
+ ['Electrons',e.n]
+ ];
+ document.getElementById('infoGrid').innerHTML=info.map(x=>
+ `<div class="info"><b>${x[0]}</b><br>${x[1]}</div>`).join('');
+ document.getElementById('dFact').textContent=getFact(e);
+ details.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function getPeriod(n){
+ if(n<=2)return 1;if(n<=10)return 2;if(n<=18)return 3;
+ if(n<=36)return 4;if(n<=54)return 5;if(n<=86)return 6;return 7;
+}
+function getGroup(s){
+ const map={H:1,He:18,Li:1,Be:2,B:13,C:14,N:15,O:16,F:17,Ne:18,
+ Na:1,Mg:2,Al:13,Si:14,P:15,S:16,Cl:17,Ar:18,
+ K:1,Ca:2,Sc:3,Ti:4,V:5,Cr:6,Mn:7,Fe:8,Co:9,Ni:10,Cu:11,Zn:12,
+ Ga:13,Ge:14,As:15,Se:16,Br:17,Kr:18};
+ return map[s]||'Varies / f-block';
+}
+function getFact(e){
+ const facts={
+ H:'The lightest element and the most abundant element in the universe.',
+ He:'A very light noble gas used in balloons and cryogenics.',
+ C:'Carbon is essential to known life and forms many compounds.',
+ O:'Oxygen is important for respiration and combustion.',
+ Fe:'Iron is used in steel and is essential in human blood.',
+ Si:'Silicon is widely used in computer chips and electronics.',
+ Au:'Gold is a precious metal used in jewellery and electronics.',
+ Cu:'Copper is an excellent electrical conductor.',
+ U:'Uranium is a radioactive element used as nuclear fuel.'
+ };
+ return facts[e.symbol]||`${e.name} is a chemical element with atomic number ${e.n}. Its properties depend on its electron structure.`;
+}
+document.getElementById('close').onclick=()=>details.style.display='none';
+search.addEventListener('input',()=>{
+ const q=search.value.toLowerCase().trim();let count=0;
+ document.querySelectorAll('.element').forEach(card=>{
+ const match=card.dataset.search.includes(q);
+ card.style.opacity=match?'1':'.12';
+ card.style.filter=match?'none':'grayscale(1)';
+ if(q&&match)count++;
+ });
+ status.textContent=q?`${count} matching element(s)`: 'Tap any element to explore it.';
+});
+document.getElementById('rotate').onclick=()=>{
+ const on=table.dataset.rotating!=='yes';
+ table.dataset.rotating=on?'yes':'no';
+ document.getElementById('rotate').textContent='🔄 3D Rotate: '+(on?'ON':'OFF');
+ table.style.animation=on?'rotate3d 12s ease-in-out infinite alternate':'none';
+};
+document.getElementById('reset').onclick=()=>{
+ table.style.transform='rotateX(0deg) rotateY(0deg)';
+ table.style.animation='none';
+ table.dataset.rotating='no';
+ document.getElementById('rotate').textContent='🔄 3D Rotate: OFF';
+ search.value='';
+ search.dispatchEvent(new Event('input'));
+};
+const themes={
+ cyan:['#00eaff','#ff35f5','#39ff88'],
+ pink:['#ff48d7','#00eaff','#ffad42'],
+ green:['#39ff88','#00eaff','#f4ff56']
+};
+document.getElementById('theme').onchange=e=>{
+ const t=themes[e.target.value];
+ document.documentElement.style.setProperty('--cyan',t[0]);
+ document.documentElement.style.setProperty('--pink',t[1]);
+ document.documentElement.style.setProperty('--green',t[2]);
+ document.querySelectorAll('.element').forEach(el=>{
+   el.style.filter='hue-rotate('+(e.target.value==='pink'?'55deg':e.target.value==='green'?'110deg':'0deg')+')';
+ });
+};
+const labels={
+ alkali:'Alkali metals',alkaline:'Alkaline earth metals',
+ transition:'Transition metals',post:'Post-transition metals',
+ metalloid:'Metalloids',nonmetal:'Other nonmetals',
+ halogen:'Halogens',noble:'Noble gases',
+ lanthanide:'Lanthanides',actinide:'Actinides'
+};
+const legend=document.getElementById('legend');
+Object.entries(labels).forEach(([cat,label])=>{
+ const item=document.createElement('span');
+ item.innerHTML=`<i class="dot" style="background:var(--${cat==='alkali'?'cyan':'cyan'})"></i>${label}`;
+ item.style.color='var(--cyan)';
+ legend.appendChild(item);
+});
+const canvas=document.getElementById('particles');
+const ctx=canvas.getContext('2d');let particles=[];
+function resize(){
+ canvas.width=innerWidth;canvas.height=innerHeight;
+ particles=Array.from({length:Math.min(75,Math.floor(innerWidth/7))},()=>({
+ x:Math.random()*canvas.width,y:Math.random()*canvas.height,
+ r:Math.random()*1.8+.4,vy:Math.random()*.45+.12
+ }));
+}
+function animate(){
+ ctx.clearRect(0,0,canvas.width,canvas.height);
+ particles.forEach(p=>{
+  p.y-=p.vy;if(p.y<0){p.y=canvas.height;p.x=Math.random()*canvas.width}
+  ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+  ctx.fillStyle='#25ddff';ctx.shadowBlur=8;ctx.shadowColor='#00eaff';ctx.fill();
+ });
+ requestAnimationFrame(animate);
+}
+resize();animate();addEventListener('resize',resize);
+const style=document.createElement('style');
+style.textContent=`@keyframes rotate3d {
+ 0%{transform:rotateX(0deg) rotateY(-2deg)}
+ 50%{transform:rotateX(2deg) rotateY(2deg)}
+ 100%{transform:rotateX(-1deg) rotateY(-2deg)}
+}`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
